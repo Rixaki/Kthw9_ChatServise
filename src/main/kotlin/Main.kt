@@ -1,0 +1,23 @@
+fun main(args: Array<String>) {
+    val service = ChatService()
+    service.addMessage(1, 2, "Hello, 2")
+    service.addMessage(1, 2, "Hello, again!")
+    service.addMessage(2, 1, "Hello, 1!")
+    service.addMessage(10, 11, "Hello, 11")
+    service.addMessage(11, 10, "Hello, 10")
+
+    service.printChatByUsers(1, 2)
+    service.printChatByUsers(10, 11)
+    service.printChatByUsers(10, 1)
+    println()
+    println()
+    service.printChatById(1, 2, 12)
+    //service.getChat(1, 2)
+    //service.getChats()
+    println()
+    service.getChatsWithMsg()
+    println()
+    service.deleteMessage(2, 1, 12)
+    service.addMessage(1,3,"unreaded msg")
+    service.getUnreadChatsCount()
+}
