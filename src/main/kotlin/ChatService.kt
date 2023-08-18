@@ -65,9 +65,9 @@ class ChatService {
         }
     }
 
-    fun getChat (
+    fun getChat(
         idChatSearch: Int
-    ) :Chat {
+    ): Chat {
         val predicate = fun(chat: Chat) = (chat.chatId == idChatSearch)
         if (chats.none(predicate)) {
             throw RuntimeException("No search result with id#$idChatSearch, service have ${chats.size} chats with id#${chats[0].chatId} and users: ${chats[0].idUser1}, ${chats[0].idUser2}.")
@@ -76,7 +76,7 @@ class ChatService {
         }
     }
 
-    fun printChatById (
+    fun printChatByFlags(
         idChatSearch: Int,
         idMsgSearch: Int = -1,
         countMsg: Int = -1
@@ -86,11 +86,25 @@ class ChatService {
             throw RuntimeException("No search result with id#$idChatSearch, service have ${chats.size} chats with id#${chats[0].chatId} and users: ${chats[0].idUser1}, ${chats[0].idUser2}.")
         } else {
             val chat: Chat = chats.find(predicate)!!
-            chat.printMessages(idMsgSearch,countMsg)
+            chat.printMessages(idMsgSearch, countMsg)
         }
     }
 
-    fun getChats () : MutableList<Chat> {
+    fun getChatByFlags(
+        idChatSearch: Int,
+        idMsgSearch: Int = -1,
+        countMsg: Int = -1
+    ): MutableList<Message>? {
+        val predicate = fun(chat: Chat) = (chat.chatId == idChatSearch)
+        if (chats.none(predicate)) {
+            throw RuntimeException("No search result with id#$idChatSearch, service have ${chats.size} chats with id#${chats[0].chatId} and users: ${chats[0].idUser1}, ${chats[0].idUser2}.")
+        } else {
+            val chat: Chat = chats.find(predicate)!!
+            return chat.toReadedStatusMessages(idMsgSearch, countMsg)
+        }
+    }
+
+    fun getChats(): MutableList<Chat> {
         val resultList: MutableList<Chat> = mutableListOf<Chat>()
         for (chat in chats) {
             resultList += chat
@@ -98,7 +112,7 @@ class ChatService {
         return resultList
     }
 
-    fun printChats () {
+    fun printChats() {
         val sb: StringBuilder = StringBuilder()
         for (chat in chats) {
             sb.append("Chat #${chat.chatId}, users: id#${chat.idUser1} and id#${chat.idUser2}" + "\n")
@@ -106,22 +120,26 @@ class ChatService {
         print(sb)
     }
 
-    fun getChatsWithMsg () : MutableList<Chat> {
+    fun getChatsWithMsg(): MutableList<Chat> {
         val resultList: MutableList<Chat> = mutableListOf<Chat>()
+        for (chat in chats) {
+            resultList += chat
+        }
+        return resultList
+    }
+
+    fun printChatsWithMsg() {
         val sb: StringBuilder = StringBuilder()
         for (chat in chats) {
             sb.append("Chat #${chat.chatId}, users: id#${chat.idUser1} and id#${chat.idUser2}" + "\n")
             sb.append("last message (chat #${chat.chatId}): ")
             print(sb)
             sb.clear()
-            sb.append(chat.getLastMessage())
+            sb.append(chat.printLastMessage())
             sb.append("\n")
             sb.clear()
-
-            resultList += chat
         }
         print(sb)
-        return resultList
     }
 
     fun deleteMessage(
@@ -163,10 +181,10 @@ class ChatService {
         }
     }
 
-    fun getUnreadChatsCount() : Int {
+    fun getUnreadChatsCount(): Int {
         var resultCounter: Int = 0
         val unreadedChats: MutableList<Chat> = chats.filter { it.isHaveUnread() }.toMutableList()
-        if (unreadedChats.isEmpty()){
+        if (unreadedChats.isEmpty()) {
             println("All chats readed")
             return 0
         } else {
@@ -231,11 +249,8 @@ data class Chat(
         if (idMsgSearch == -1) {
             filteredChat = chatWall
         } else {
-            val messageSearch: Message? = chatWall.find { it.idMessage == idMsgSearch }
-            val indexMsgSearch = chatWall.find { it.idMessage == idMsgSearch }?.idMessage
-            if (messageSearch == null) {
-                throw RuntimeException("message #$idMsgSearch was not founded")
-            }
+            val messageSearch: Message = chatWall.find { it.idMessage == idMsgSearch }
+                ?: throw RuntimeException("message #$idMsgSearch was not founded")
             if (printCounterFlag == -1) {
                 filteredChat = chatWall
                     .filter { it.idMessage >= idMsgSearch }
@@ -260,7 +275,38 @@ data class Chat(
         return 0
     }
 
-    fun getLastMessage () {
+    fun toReadedStatusMessages( //like printMessages, but without print and return filteredChat
+        idMsgSearch: Int = -1,
+        printCounterFlag: Int = -1
+    ): MutableList<Message>? {
+        var filteredChat: MutableList<Message>? = null
+        if (idMsgSearch == -1) {
+            filteredChat = chatWall
+        } else {
+            val messageSearch: Message = chatWall.find { it.idMessage == idMsgSearch }
+                ?: throw RuntimeException("message #$idMsgSearch was not founded")
+            if (printCounterFlag == -1) {
+                filteredChat = chatWall
+                    .filter { it.idMessage >= idMsgSearch }
+                    .toMutableList()
+            } else {
+                filteredChat = chatWall
+                    .filter { it.idMessage >= idMsgSearch }
+                    .take(printCounterFlag) //save filter without OutOfBounds
+                    .toMutableList()
+            }
+        }
+        for (message in filteredChat) {
+            message.isReaded = true
+        }
+        return filteredChat
+    }
+
+    fun getLastMessage(): Message {
+        return chatWall.last()
+    }
+
+    fun printLastMessage() {
         val lastMsg = chatWall.last()
         println("idUser${lastMsg.idAuthor} (msg #${lastMsg.idMessage}) - ${lastMsg.text}")
     }
@@ -269,11 +315,11 @@ data class Chat(
         return chatWall.find { it.idMessage == id }
     }
 
-    fun isHaveUnread (): Boolean {
-        return (chatWall.find{ !it.isReaded } != null)
+    fun isHaveUnread(): Boolean {
+        return (chatWall.find { !it.isReaded } != null)
     }
 
-    fun isEmpty (): Boolean {
+    fun isEmpty(): Boolean {
         return chatWall.isEmpty()
     }
 }
@@ -284,7 +330,11 @@ data class Message(
     var isDeleted: Boolean = false,
     var isReaded: Boolean = false,
     var text: String = "none text"
-)
+) {
+    fun printMessage() {
+        println("idUser$idAuthor (msg #$idMessage) - $text")
+    }
+}
 
 fun leftLowRightHigh(arg1: Int, arg2: Int): Pair<Int, Int> {
     var idLeft: Int = 0
