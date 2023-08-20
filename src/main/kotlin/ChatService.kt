@@ -42,7 +42,7 @@ class ChatService {
         }
     }
 
-    fun printChatByUsers(
+    fun printChatByUsers( //without sequence-update due to only-value separator alg
         idUser1: Int,
         idUser2: Int,
     ): Int {
@@ -59,8 +59,8 @@ class ChatService {
             val chat: Chat = chats.find(predicate)!!
             sb.append(" (chat #${chat.chatId}):")
             println(sb)
-            chat.printMessages()
-            println()
+            println(chat.printMessages())
+            //println()
             return 0
         }
     }
@@ -76,14 +76,14 @@ class ChatService {
         }
     }
 
-    fun printChatByFlags(
+    fun printChatByFlags( //printMessages was updated
         idChatSearch: Int,
         idMsgSearch: Int = -1,
         countMsg: Int = -1
     ) {
         val predicate = fun(chat: Chat) = (chat.chatId == idChatSearch)
         if (chats.none(predicate)) {
-            throw RuntimeException("No search result with id#$idChatSearch, service have ${chats.size} chats with id#${chats[0].chatId} and users: ${chats[0].idUser1}, ${chats[0].idUser2}.")
+            throw RuntimeException("No search result with id#$idChatSearch.")
         } else {
             val chat: Chat = chats.find(predicate)!!
             chat.printMessages(idMsgSearch, countMsg)
@@ -112,6 +112,7 @@ class ChatService {
         return resultList
     }
 
+    /*
     fun printChats() {
         val sb: StringBuilder = StringBuilder()
         for (chat in chats) {
@@ -119,6 +120,7 @@ class ChatService {
         }
         print(sb)
     }
+    */
 
     fun getChatsWithMsg(): MutableList<Chat> {
         val resultList: MutableList<Chat> = mutableListOf<Chat>()
@@ -128,6 +130,7 @@ class ChatService {
         return resultList
     }
 
+    /*
     fun printChatsWithMsg() {
         val sb: StringBuilder = StringBuilder()
         for (chat in chats) {
@@ -135,11 +138,21 @@ class ChatService {
             sb.append("last message (chat #${chat.chatId}): ")
             print(sb)
             sb.clear()
-            sb.append(chat.printLastMessage())
+            sb.append(chat.lastMessageToString())
             sb.append("\n")
             sb.clear()
         }
         print(sb)
+    }
+    */
+
+    fun printChatsWithMsg() { //updated
+        println("Chat list:")
+        val chatsDigest = chats
+            .joinToString(separator = "\n") { "Chat #${it.chatId} (users #${it.idUser1} and " +
+                    "#${it.idUser2}): " + it.lastMessageToString() }
+            .ifEmpty {"No chats."}
+        println(chatsDigest)
     }
 
     fun deleteMessage(
@@ -181,29 +194,20 @@ class ChatService {
         }
     }
 
-    fun getUnreadChatsCount(): Int {
-        var resultCounter: Int = 0
-        val unreadedChats: MutableList<Chat> = chats.filter { it.isHaveUnread() }.toMutableList()
-        if (unreadedChats.isEmpty()) {
-            println("All chats readed")
-            return 0
-        } else {
-            val sb: StringBuilder = StringBuilder()
-            sb.append("Unreaded chats:" + "\n")
-            for (chat in unreadedChats) {
-                sb.append("Chat #${chat.chatId}, users: id#${chat.idUser1} and id#${chat.idUser2}" + "\n")
-                sb.append("last message (chat #${chat.chatId}): ")
-                print(sb)
-                sb.clear()
-                sb.append(chat.getLastMessage())
-                sb.append("\n")
-                sb.clear()
+    fun getUnreadChats(): MutableList<Chat>? {
+        return chats.asSequence()
+            .filter { it.isHaveUnread() }
+            .ifEmpty { emptySequence() }
+            .toMutableList()
+    }
 
-                resultCounter += 1
-            }
-            print(sb)
-            return resultCounter
-        }
+    fun getUnreadChatsPrint() { //updates with sequences
+        println("Unreaded chats:")
+        val unreadDigest = chats.asSequence()
+            .filter { it.isHaveUnread() }
+            .joinToString(separator = "\n" ) { "Chat #${it.chatId}: " + it.lastMessageToString() }
+            .ifEmpty {"All chats read."}
+        println(unreadDigest)
     }
 }
 
@@ -228,23 +232,26 @@ data class Chat(
         chatWall += msg
     }
 
-    fun deleteMessage(idMessageSearch: Int): Int {
+    fun deleteMessage(idMessageSearch: Int): Int { //rewrote
         val predicate = fun(msg: Message): Boolean { return msg.idMessage == idMessageSearch }
         if (chatWall.find(predicate) == null) {
             println("Attention to delete unpredictable message")
             return -1
         } else {
-            val message: Message = chatWall.find(predicate)!!
-            message.isDeleted = true
+            //val message: Message = chatWall.find(predicate)!!
+            //message.isDeleted = true
+            chatWall
+                .find(predicate)!!
+                .isDeleted = true
             return 1
         }
     }
 
-    fun printMessages(
+    fun printMessages( //updated with sequences
         idMsgSearch: Int = -1,
         printCounterFlag: Int = -1
-    ): Int {
-        val sb: StringBuilder = StringBuilder()
+    ): String {
+        //val sb: StringBuilder = StringBuilder()
         var filteredChat: MutableList<Message>? = null
         if (idMsgSearch == -1) {
             filteredChat = chatWall
@@ -252,16 +259,17 @@ data class Chat(
             val messageSearch: Message = chatWall.find { it.idMessage == idMsgSearch }
                 ?: throw RuntimeException("message #$idMsgSearch was not founded")
             if (printCounterFlag == -1) {
-                filteredChat = chatWall
+                filteredChat = chatWall.asSequence()
                     .filter { it.idMessage >= idMsgSearch }
                     .toMutableList()
             } else {
-                filteredChat = chatWall
+                filteredChat = chatWall.asSequence()
                     .filter { it.idMessage >= idMsgSearch }
                     .take(printCounterFlag) //save filter without OutOfBounds
                     .toMutableList()
             }
         }
+        /*
         for (message in filteredChat) {
             if (!message.isDeleted) {
                 sb.append("idUser${message.idAuthor} (#${message.idMessage}) - ${message.text}" + "\n")
@@ -270,9 +278,22 @@ data class Chat(
                 sb.append("<deleted>" + "\n")
                 message.isReaded = true
             }
+            println("Unreaded chats:")
+            val chatText = chats.asSequence()
+                .filter { it.isHaveUnread() }
+                .joinToString(separator = "\n" ) { "Chat #${it.chatId}: " + it.lastMessageToString() }
+                .ifEmpty {"All chats read."}
+            println(unreadDigest)
         }
-        print(sb)
-        return 0
+        */
+        filteredChat.forEach { if (it.isDeleted) it.text = "<deleted>" else it.text}
+        val resultMessage = filteredChat
+            .fold(Message(text="")){
+                acc :Message, message: Message -> acc.
+                    copy(text = (acc.text + "user#${message.idAuthor} (msg#${message.idMessage}) - ${message.text}" + "\n"))
+            }
+        filteredChat.forEach { it.isReaded = true }
+        return resultMessage.text
     }
 
     fun toReadedStatusMessages( //like printMessages, but without print and return filteredChat
@@ -286,19 +307,17 @@ data class Chat(
             val messageSearch: Message = chatWall.find { it.idMessage == idMsgSearch }
                 ?: throw RuntimeException("message #$idMsgSearch was not founded")
             if (printCounterFlag == -1) {
-                filteredChat = chatWall
+                filteredChat = chatWall.asSequence()
                     .filter { it.idMessage >= idMsgSearch }
                     .toMutableList()
             } else {
-                filteredChat = chatWall
+                filteredChat = chatWall.asSequence()
                     .filter { it.idMessage >= idMsgSearch }
                     .take(printCounterFlag) //save filter without OutOfBounds
                     .toMutableList()
             }
         }
-        for (message in filteredChat) {
-            message.isReaded = true
-        }
+        filteredChat.forEach { it.isReaded = true }
         return filteredChat
     }
 
@@ -306,9 +325,9 @@ data class Chat(
         return chatWall.last()
     }
 
-    fun printLastMessage() {
+    fun lastMessageToString(): String {
         val lastMsg = chatWall.last()
-        println("idUser${lastMsg.idAuthor} (msg #${lastMsg.idMessage}) - ${lastMsg.text}")
+        return ("idUser${lastMsg.idAuthor} (msg #${lastMsg.idMessage}) - ${lastMsg.text}")
     }
 
     fun getMessageById(id: Int): Message? {
